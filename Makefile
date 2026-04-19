@@ -32,12 +32,12 @@ Install one (e.g., i686-linux-gnu-gcc or i386-unknown-elf-gcc) \
 or run: make PREFIX=<triplet->)
 endif
 
-BOOTIMG := /usr/local/grub/lib/grub/i386-pc/boot.img
+BOOTIMG := /usr/local/grub/i386-pc/boot.img
 GRUBLOC := /usr/local/grub/bin/
 
 else
 PREFIX  ?=
-BOOTIMG := /usr/lib/grub/i386-pc/boot.img
+BOOTIMG := /usr/local/grub/i386-pc/boot.img
 GRUBLOC :=
 endif
 
@@ -78,16 +78,17 @@ bin: obj $(OBJ)
 obj:
 	mkdir -p obj
 
-rootfs.img:
+rootfs.img: kernel grub.cfg
+	rm -f rootfs.img grub.img
 	dd if=/dev/zero of=rootfs.img bs=1M count=32
-	$(GRUBLOC)grub-mkimage -p "(hd0,msdos1)/boot" -o grub.img -O i386-pc normal biosdisk multiboot multiboot2 configfile fat exfat part_msdos
-	dd if=$(BOOTIMG) of=rootfs.img conv=notrunc
-	dd if=grub.img of=rootfs.img conv=notrunc bs=512 seek=1 #########
 	echo 'start=2048, type=83, bootable' | sfdisk rootfs.img
 	mkfs.vfat --offset 2048 -F16 rootfs.img
+	$(GRUBLOC)grub-mkimage -p "(hd0,msdos1)/boot" -o grub.img -O i386-pc normal biosdisk multiboot multiboot2 configfile fat exfat part_msdos
+	dd if=$(BOOTIMG) of=rootfs.img conv=notrunc bs=446 count=1
+	dd if=grub.img of=rootfs.img conv=notrunc bs=512 seek=1 #########
+	mmd -i rootfs.img@@1M ::/boot
 	mcopy -i rootfs.img@@1M kernel ::/
-	mmd -i rootfs.img@@1M boot 
-	mcopy -i rootfs.img@@1M grub.cfg ::/boot
+	mcopy -i rootfs.img@@1M grub.cfg ::/boot/
 	@echo " -- BUILD COMPLETED SUCCESSFULLY --"
 
 
