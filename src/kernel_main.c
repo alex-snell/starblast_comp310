@@ -237,10 +237,19 @@ void main() {
     parseMultiboot2Info();
 
     // White out the screen
-    for(int x = 0; x < getFramebufferWidth(); x++) {
+   /* for(int x = 0; x < getFramebufferWidth(); x++) {
         for(int y = 0; y < getFramebufferHeight(); y++) {
             drawPixel(x, y, 0xffffff);
         }
+    }*/
+    //Gradient test validating framebuffer math
+    for(int y =0; y < getFramebufferHeight(); y++){
+        for(int x = 0; x < getFramebufferWidth(); x++){
+		int r = (x * 255) / getFramebufferWidth();
+		int g = (y * 255) / getFramebufferHeight();
+		int color = (r << 16) | (g << 8);
+		drawPixel(x,y,color);
+	}
     }
 
     while(1) {
