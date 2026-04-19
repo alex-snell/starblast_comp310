@@ -24,6 +24,7 @@
 
 
 #include <stdint.h>
+#include "video.h"
 
 #define INFO_TYPE_KERNEL_LOAD_ADDR 0x15
 #define INFO_TYPE_CMD_LINE 1
@@ -236,6 +237,18 @@ void main() {
     // of the framebuffer and the size of the screen.
     parseMultiboot2Info();
 
+
+
+    video_init();
+
+    for(uint32_t y = 0; y < getFramebufferHeight(); y++){
+	for(uint32_t x = 0; x < getFramebufferWidth(); x++) {
+		uint32_t r = (x *255) / getFramebufferWidth();
+		uint32_t g = (y * 255) / getFramebufferHeight();
+		video_set_pixel(x,y,(r<<16) | (g <<8));
+	}
+    }
+    video_flip();
     // White out the screen
    /* for(int x = 0; x < getFramebufferWidth(); x++) {
         for(int y = 0; y < getFramebufferHeight(); y++) {
@@ -243,14 +256,14 @@ void main() {
         }
     }*/
     //Gradient test validating framebuffer math
-    for(int y =0; y < getFramebufferHeight(); y++){
+    /*for(int y =0; y < getFramebufferHeight(); y++){
         for(int x = 0; x < getFramebufferWidth(); x++){
 		int r = (x * 255) / getFramebufferWidth();
 		int g = (y * 255) / getFramebufferHeight();
 		int color = (r << 16) | (g << 8);
 		drawPixel(x,y,color);
 	}
-    }
+    }*/
 
     while(1) {
 

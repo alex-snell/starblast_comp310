@@ -57,6 +57,7 @@ SDIR = src
 
 OBJS = \
 	kernel_main.o \
+	video.o \
 
 # Make sure to keep a blank line here after OBJS list
 
