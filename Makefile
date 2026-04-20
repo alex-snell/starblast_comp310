@@ -58,6 +58,8 @@ SDIR = src
 OBJS = \
 	kernel_main.o \
 	video.o \
+	timer.o \
+	input.o
 
 # Make sure to keep a blank line here after OBJS list
 
@@ -94,7 +96,7 @@ rootfs.img: kernel grub.cfg
 
 
 run:
-	qemu-system-i386 -hda rootfs.img
+	qemu-system-i386 -hda rootfs.img -display sdl,gl=on
 
 debug:
 	./launch_qemu.sh

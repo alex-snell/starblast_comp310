@@ -25,6 +25,9 @@
 
 #include <stdint.h>
 #include "video.h"
+#include "timer.h"
+#include "input.h"
+
 
 #define INFO_TYPE_KERNEL_LOAD_ADDR 0x15
 #define INFO_TYPE_CMD_LINE 1
@@ -236,41 +239,40 @@ void main() {
     // communicate key information about the hardware. It tells us the address
     // of the framebuffer and the size of the screen.
     parseMultiboot2Info();
+    
 
-
-
+    //Visual additions
     video_init();
-
-    for(uint32_t y = 0; y < getFramebufferHeight(); y++){
-	for(uint32_t x = 0; x < getFramebufferWidth(); x++) {
-		uint32_t r = (x *255) / getFramebufferWidth();
-		uint32_t g = (y * 255) / getFramebufferHeight();
-		video_set_pixel(x,y,(r<<16) | (g <<8));
-	}
-    }
-    video_flip();
-    // White out the screen
-   /* for(int x = 0; x < getFramebufferWidth(); x++) {
-        for(int y = 0; y < getFramebufferHeight(); y++) {
-            drawPixel(x, y, 0xffffff);
-        }
-    }*/
-    //Gradient test validating framebuffer math
-    /*for(int y =0; y < getFramebufferHeight(); y++){
-        for(int x = 0; x < getFramebufferWidth(); x++){
-		int r = (x * 255) / getFramebufferWidth();
-		int g = (y * 255) / getFramebufferHeight();
-		int color = (r << 16) | (g << 8);
-		drawPixel(x,y,color);
-	}
-    }*/
-
+    timer_init();
+    input_init();
+    int player_x = 500, player_y = 350;
+    const int SIZE = 50;
+    const int SPEED = 4;
     while(1) {
-
-        uint8_t status = inb(0x64);
-
-        if(status & 1) {
-            uint8_t scancode = inb(0x60);
-        }
+	input_poll();
+	 // Update position based on keys held
+    	if (input_is_key_down(KEY_LEFT))  player_x -= SPEED;
+    	if (input_is_key_down(KEY_RIGHT)) player_x += SPEED;
+    	if (input_is_key_down(KEY_UP))    player_y -= SPEED;
+    	if (input_is_key_down(KEY_DOWN))  player_y += SPEED;
+   	
+	//render
+	video_clear(0x000020);
+    	for (int y = 0; y < SIZE; y++) {
+           for (int x = 0; x < SIZE; x++) {
+            	video_set_pixel(player_x + x, player_y + y, 0xFFFFFF);
+	   }
+    	}
+	// FOR DEBUGGING ***REMOVE FOR FINAL**: visual "key down" indicator — draw a red bar at bottom
+    	// when spacebar is held. Useful for debugging.
+    	if (input_is_key_down(KEY_SPACE)) {
+            for (int y = 750; y < 760; y++) {
+            	for (int x = 0; x < 1024; x++) {
+                    video_set_pixel(x, y, 0xFF0000);
+                }
+            }
+    	}
+	video_flip();
+	timer_wait_frame();
     }
 }
