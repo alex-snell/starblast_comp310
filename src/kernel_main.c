@@ -27,7 +27,7 @@
 #include "video.h"
 #include "timer.h"
 #include "input.h"
-
+#include "game.h"
 
 #define INFO_TYPE_KERNEL_LOAD_ADDR 0x15
 #define INFO_TYPE_CMD_LINE 1
@@ -239,40 +239,14 @@ void main() {
     // communicate key information about the hardware. It tells us the address
     // of the framebuffer and the size of the screen.
     parseMultiboot2Info();
-    
-
     //Visual additions
     video_init();
     timer_init();
     input_init();
-    int player_x = 500, player_y = 350;
-    const int SIZE = 50;
-    const int SPEED = 4;
-    while(1) {
+    while(1){
 	input_poll();
-	 // Update position based on keys held
-    	if (input_is_key_down(KEY_LEFT))  player_x -= SPEED;
-    	if (input_is_key_down(KEY_RIGHT)) player_x += SPEED;
-    	if (input_is_key_down(KEY_UP))    player_y -= SPEED;
-    	if (input_is_key_down(KEY_DOWN))  player_y += SPEED;
-   	
-	//render
-	video_clear(0x000020);
-    	for (int y = 0; y < SIZE; y++) {
-           for (int x = 0; x < SIZE; x++) {
-            	video_set_pixel(player_x + x, player_y + y, 0xFFFFFF);
-	   }
-    	}
-	// FOR DEBUGGING ***REMOVE FOR FINAL**: visual "key down" indicator — draw a red bar at bottom
-    	// when spacebar is held. Useful for debugging.
-    	if (input_is_key_down(KEY_SPACE)) {
-            for (int y = 750; y < 760; y++) {
-            	for (int x = 0; x < 1024; x++) {
-                    video_set_pixel(x, y, 0xFF0000);
-                }
-            }
-    	}
-	video_flip();
-	timer_wait_frame();
+        game_update_and_render();
+        video_flip();
+        timer_wait_frame();
     }
 }

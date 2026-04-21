@@ -59,7 +59,8 @@ OBJS = \
 	kernel_main.o \
 	video.o \
 	timer.o \
-	input.o
+	input.o \
+	game.o
 
 # Make sure to keep a blank line here after OBJS list
 
