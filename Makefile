@@ -60,7 +60,9 @@ OBJS = \
 	video.o \
 	timer.o \
 	input.o \
-	game.o
+	game.o \
+	sprite.o \
+	sprites_data.o \
 
 # Make sure to keep a blank line here after OBJS list
 

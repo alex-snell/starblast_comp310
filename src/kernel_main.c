@@ -243,6 +243,7 @@ void main() {
     video_init();
     timer_init();
     input_init();
+    game_init();
     while(1){
 	input_poll();
         game_update_and_render();
