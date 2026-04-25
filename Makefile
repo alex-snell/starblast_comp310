@@ -63,6 +63,7 @@ OBJS = \
 	game.o \
 	sprite.o \
 	sprites_data.o \
+	text.o \
 
 # Make sure to keep a blank line here after OBJS list
 

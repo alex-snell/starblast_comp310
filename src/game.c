@@ -3,7 +3,10 @@
 #include "video.h"
 #include "input.h"
 #include "sprite.h"
+#include "text.h"
 
+//end game screen flash
+static int game_over_frames;  // counts up while in game-over state
 // --- Player ---
 #define PLAYER_SIZE 50
 #define PLAYER_SPEED 4
@@ -349,6 +352,27 @@ void game_init(void)
     player_damage = 0;
     player_invuln_frames = 0;
     game_state = STATE_PLAYING;
+    game_over_frames = 0;
+}
+
+static void draw_game_over_overlay(void) {
+    const char *line1 = "GAME OVER";
+    const char *line2 = "PRESS R TO RESTART";
+
+    int scale1 = 8;  // big "GAME OVER"
+    int scale2 = 3;  // smaller "PRESS R..."
+
+    int x1 = SCREEN_WIDTH / 2 - text_width(line1, scale1) / 2;
+    int y1 = SCREEN_HEIGHT / 2 - text_height(scale1) / 2 - 40;
+
+    text_draw(line1, x1, y1, 0xFF0000, scale1);
+
+    // Flash the "PRESS R" text every ~30 frames (half-second at 60 FPS)
+    if ((game_over_frames / 30) & 1) {
+        int x2 = SCREEN_WIDTH / 2 - text_width(line2, scale2) / 2;
+        int y2 = y1 + text_height(scale1) + 40;
+        text_draw(line2, x2, y2, 0xFFFFFF, scale2);
+    }
 }
 
 void game_update_and_render(void) {
@@ -358,10 +382,19 @@ void game_update_and_render(void) {
     	update_enemies();
     	update_enemy_bullets();
     	handle_collisions();
+    } else if (game_state == STATE_GAME_OVER) {
+        game_over_frames++;
+        if (input_is_key_down(KEY_R)) {
+            game_init();
+            return;
+        }
     }
     video_clear(0x000020);
     draw_player();
     draw_bullets();
     draw_enemy_bullets();
     draw_enemies();
+    if (game_state == STATE_GAME_OVER) {
+        draw_game_over_overlay();
+    }
 }
