@@ -17,8 +17,8 @@ static int player_y;
 // --- Bullets ---
 #define MAX_BULLETS 32
 #define BULLET_SPEED 8
-#define BULLET_WIDTH 4
-#define BULLET_HEIGHT 12
+#define BULLET_WIDTH 8
+#define BULLET_HEIGHT 16
 #define MAX_ENEMY_BULLETS 64
 #define ENEMY_BULLET_SPEED 5
 #define ENEMY_FIRE_RATE_MIN 120
@@ -44,7 +44,7 @@ static Bullet bullets[MAX_BULLETS];
 
 //--- ENEMIES ---
 #define MAX_ENEMIES 64
-#define ENEMY_SIZE 40
+#define ENEMY_SIZE 64
 #define ENEMY_SPEED 2
 #define SPAWN_INTERVAL 60 // frames between spawns (60 = 1 second at 60 FPS)
 
@@ -176,13 +176,10 @@ static void draw_player(void) {
     sprite_draw(current_player_sprite(), player_x, player_y);
 }
 
-static void draw_bullets(void)
-{
-    for (int i = 0; i < MAX_BULLETS; i++)
-    {
-        if (!bullets[i].active)
-            continue;
-        draw_rect(bullets[i].x, bullets[i].y, BULLET_WIDTH, BULLET_HEIGHT, 0xFFFF00);
+static void draw_bullets(void) {
+    for (int i = 0; i < MAX_BULLETS; i++) {
+        if (!bullets[i].active) continue;
+        sprite_draw(&sprite_player_bullet, bullets[i].x, bullets[i].y);
     }
 }
 
@@ -248,13 +245,10 @@ static void update_enemies(void)
     }
 }
 
-static void draw_enemies(void)
-{
-    for (int i = 0; i < MAX_ENEMIES; i++)
-    {
-        if (!enemies[i].active)
-            continue;
-        draw_rect(enemies[i].x, enemies[i].y, ENEMY_SIZE, ENEMY_SIZE, 0xFF4040);
+static void draw_enemies(void) {
+    for (int i = 0; i < MAX_ENEMIES; i++) {
+        if (!enemies[i].active) continue;
+        sprite_draw(&sprite_enemy_ship, enemies[i].x, enemies[i].y);
     }
 }
 
@@ -272,8 +266,7 @@ static void update_enemy_bullets(void) {
 static void draw_enemy_bullets(void) {
     for (int i = 0; i < MAX_ENEMY_BULLETS; i++) {
         if (!enemy_bullets[i].active) continue;
-        draw_rect(enemy_bullets[i].x, enemy_bullets[i].y,
-                  BULLET_WIDTH, BULLET_HEIGHT, 0xFF4040);
+        sprite_draw(&sprite_enemy_bullet, enemy_bullets[i].x, enemy_bullets[i].y);
     }
 }
 

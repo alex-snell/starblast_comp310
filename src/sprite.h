@@ -21,4 +21,7 @@ extern const Sprite sprite_ship_healthy;
 extern const Sprite sprite_ship_damaged;
 extern const Sprite sprite_ship_slight;
 extern const Sprite sprite_ship_critical;
+extern const Sprite sprite_player_bullet;
+extern const Sprite sprite_enemy_bullet;
+extern const Sprite sprite_enemy_ship;
 #endif
