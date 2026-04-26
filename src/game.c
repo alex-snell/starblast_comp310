@@ -44,9 +44,12 @@ static Bullet bullets[MAX_BULLETS];
 
 //--- ENEMIES ---
 #define MAX_ENEMIES 64
-#define ENEMY_SIZE 64
+#define ENEMY_SIZE  64
 #define ENEMY_SPEED 2
 #define SPAWN_INTERVAL 60 // frames between spawns (60 = 1 second at 60 FPS)
+#define PATTERN_EASY 0
+#define PATTERN_MEDIUM 1
+#define PATTERN_HARD 2
 
 typedef struct
 {
@@ -104,20 +107,23 @@ static void fire_enemy_bullet(int x, int y) {
     }
 }
 
-static void update_player(void) {
-    if (input_is_key_down(KEY_LEFT))  player_x -= PLAYER_SPEED;
-    if (input_is_key_down(KEY_RIGHT)) player_x += PLAYER_SPEED;
-    if (input_is_key_down(KEY_UP))    player_y -= PLAYER_SPEED;
-    if (input_is_key_down(KEY_DOWN))  player_y += PLAYER_SPEED;
+static void update_player(void)
+{
+    if (input_is_key_down(KEY_LEFT))
+        player_x -= PLAYER_SPEED;
+    if (input_is_key_down(KEY_RIGHT))
+        player_x += PLAYER_SPEED;
+    if (input_is_key_down(KEY_UP))
+        player_y -= PLAYER_SPEED;
+    if (input_is_key_down(KEY_DOWN))
+        player_y += PLAYER_SPEED;
+
     if (player_x < 0)
         player_x = 0;
     if (player_x > SCREEN_WIDTH - PLAYER_SIZE)
         player_x = SCREEN_WIDTH - PLAYER_SIZE;
-
-    int min_y = SCREEN_HEIGHT / 2; // top of bottom half
-
-    if (player_y < min_y)
-        player_y = min_y;
+    if (player_y < 0)
+        player_y = 0;
 
     if (player_y > SCREEN_HEIGHT - PLAYER_SIZE)
         player_y = SCREEN_HEIGHT - PLAYER_SIZE;
@@ -159,6 +165,7 @@ static void draw_rect(int x, int y, int w, int h, uint32_t color)
     }
 }
 
+
 static const Sprite *current_player_sprite(void) {
     if (player_damage < 2) return &sprite_ship_healthy;
     if (player_damage < 4) return &sprite_ship_slight;
@@ -194,7 +201,7 @@ static void damage_player(int amount) {
    }else{ 
    	player_invuln_frames = INVULN_DURATION;
    }
-    // TODO: trigger explosion sound, screen shake, etc.
+
 }
 
 //ENEMIES
@@ -245,6 +252,7 @@ static void update_enemies(void)
     }
 }
 
+
 static void draw_enemies(void) {
     for (int i = 0; i < MAX_ENEMIES; i++) {
         if (!enemies[i].active) continue;
@@ -269,7 +277,6 @@ static void draw_enemy_bullets(void) {
         sprite_draw(&sprite_enemy_bullet, enemy_bullets[i].x, enemy_bullets[i].y);
     }
 }
-
 //--- Collisions ---
 
 // collision helper
@@ -287,20 +294,25 @@ static int rects_overlap(int ax, int ay, int aw, int ah,
     return 1;
 }
 
-//collision handler
-static void handle_collisions(void) {
-    // Palyer bullet vs enemy
-    for (int b = 0; b < MAX_BULLETS; b++) {
-        if (!bullets[b].active) continue;
-        for (int e = 0; e < MAX_ENEMIES; e++) {
-            if (!enemies[e].active) continue;
+// collision handler
+static void handle_collisions(void)
+{
+    // Bullet vs enemy
+    for (int b = 0; b < MAX_BULLETS; b++)
+    {
+        if (!bullets[b].active)
+            continue;
+        for (int e = 0; e < MAX_ENEMIES; e++)
+        {
+            if (!enemies[e].active)
+                continue;
+
             if (rects_overlap(bullets[b].x, bullets[b].y, BULLET_WIDTH, BULLET_HEIGHT,
                               enemies[e].x, enemies[e].y, ENEMY_SIZE, ENEMY_SIZE))
             {
                 bullets[b].active = 0;
                 enemies[e].active = 0;
                 break; // this bullet is consumed, stop checking enemies
-
             }
         }
     }
