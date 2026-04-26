@@ -40,6 +40,21 @@ static Enemy enemies[MAX_ENEMIES];
 static int spawn_timer;
 static uint32_t rng_state;
 
+// --- BACKGROUND / LEVEL ---
+#define NUM_STARS 100
+
+typedef struct {
+    int x;
+    int y;
+} Star;
+
+static Star stars[NUM_STARS];
+
+static int bg_offset;
+static int scroll_speed;
+static int level;
+static int score;
+
 //Really crude randomizer for enemy spawn
 static uint32_t rand_next(void) {
     rng_state = rng_state * 1103515245 + 12345;
@@ -169,9 +184,41 @@ static void handle_collisions(void) {
                               enemies[e].x, enemies[e].y, ENEMY_SIZE, ENEMY_SIZE)) {
                 bullets[b].active = 0;
                 enemies[e].active = 0;
+                score += 10;
                 break;  // this bullet is consumed, stop checking enemies
             }
         }
+    }
+}
+
+static void draw_background(void) {
+    uint32_t star_color;
+    uint32_t bg_color;
+
+    if (level == 1) {
+        star_color = 0xFFFFFF;
+        bg_color = 0x000020;
+        scroll_speed = 1;
+    } else if (level == 2) {
+        star_color = 0x00FF00;
+        bg_color = 0x001000;
+        scroll_speed = 2;
+    } else {
+        star_color = 0xFF0000;
+        bg_color = 0x200000;
+        scroll_speed = 3;
+    }
+
+    video_clear(bg_color);
+
+    bg_offset += scroll_speed;
+    if (bg_offset >= SCREEN_HEIGHT) {
+        bg_offset = 0;
+    }
+
+    for (int i = 0; i < NUM_STARS; i++) {
+        int y = (stars[i].y + bg_offset) % SCREEN_HEIGHT;
+        video_set_pixel(stars[i].x, y, star_color);
     }
 }
 
@@ -188,15 +235,29 @@ void game_init(void) {
     space_was_down = 0;
     spawn_timer = SPAWN_INTERVAL;
     rng_state = 0xC0FFEE; //uhhh idk
+
+    bg_offset = 0;
+    scroll_speed = 1;
+    level = 1;
+    score = 0;
+
+    for (int i = 0; i < NUM_STARS; i++) {
+        stars[i].x = (i * 37) % SCREEN_WIDTH;
+        stars[i].y = (i * 53) % SCREEN_HEIGHT;
+    }
 }
 
 void game_update_and_render(void) {
+    if (score > 100) level = 2;
+    if (score > 300) level = 3;
+
     update_player();
     update_bullets();
     update_enemies();
     handle_collisions();
 
-    video_clear(0x000020);
+    draw_background();
+
     draw_player();
     draw_bullets();
     draw_enemies();
