@@ -4,6 +4,7 @@
 #include "input.h"
 #include "sprite.h"
 #include "text.h"
+#include "digits.h"
 
 //end game screen flash
 static int game_over_frames;  // counts up while in game-over state
@@ -60,6 +61,18 @@ static Enemy enemies[MAX_ENEMIES];
 static int spawn_timer;
 static uint32_t rng_state;
 static Bullet enemy_bullets[MAX_ENEMY_BULLETS];
+
+//--- HUD ---
+static int score = 0;
+static int level = 1;
+
+static int get_enemy_count(void) {
+	int count = 0;
+	for (int i = 0; i < MAX_ENEMIES; i++) {
+		if (enemies[i].active) count++;
+	}
+	return count;
+}
 
 //---Game State---
 typedef enum {
@@ -157,6 +170,61 @@ static void draw_rect(int x, int y, int w, int h, uint32_t color)
             video_set_pixel(x + dx, y + dy, color);
         }
     }
+}
+
+static void draw_digit(int x, int y, int digit) {
+	switch(digit) {
+		case 0: sprite_draw(&sprite_digit_0, x, y);
+		break;
+                case 1: sprite_draw(&sprite_digit_1, x, y);
+                break;
+/*                case 2: sprite_draw(&sprite_digit_2, x, y);
+                break;
+                case 3: sprite_draw(&sprite_digit_3, x, y);
+                break;
+                case 4: sprite_draw(&sprite_digit_4, x, y);
+                break;
+                case 5: sprite_draw(&sprite_digit_5, x, y);
+                break;
+                case 6: sprite_draw(&sprite_digit_6, x, y);
+                break;
+                case 7: sprite_draw(&sprite_digit_7, x, y);
+                break;
+                case 8: sprite_draw(&sprite_digit_8, x, y);
+                break;
+                case 9: sprite_draw(&sprite_digit_9, x, y);
+                break;
+*/		// fallback
+		default:
+			video_set_pixel(x, y, 0xFFFFFF);
+			break;
+	}
+}
+
+static void draw_number(int x, int y, int num) {
+	if (num == 0) {
+		draw_digit(x, y, 0);
+		return;
+	}
+
+	int digits[10];
+	int count = 0;
+
+	while (num > 0) {
+		digits[count++] = num % 10;
+		num /= 10;
+	}
+
+	for (int i = 0; i < count; i++) {
+		draw_digit(x + (count - i - 1) * 4, y, digits[i]);
+	}
+}
+
+static void draw_hud(void) {
+	draw_number(10, 10, score);				// score
+	draw_number(10, 25, get_enemy_count());			// enemies
+	draw_number(10, 40, level);				// level
+	draw_number(10, 55, PLAYER_MAX_DAMAGE - player_damage);	// health
 }
 
 static const Sprite *current_player_sprite(void) {
@@ -306,6 +374,7 @@ static void handle_collisions(void) {
             {
                 bullets[b].active = 0;
                 enemies[e].active = 0;
+		score += 10;
                 break; // this bullet is consumed, stop checking enemies
 
             }
@@ -394,6 +463,7 @@ void game_update_and_render(void) {
     draw_bullets();
     draw_enemy_bullets();
     draw_enemies();
+	draw_hud();
     if (game_state == STATE_GAME_OVER) {
         draw_game_over_overlay();
     }
