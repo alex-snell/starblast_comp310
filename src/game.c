@@ -50,7 +50,6 @@ static Bullet bullets[MAX_BULLETS];
 
 
 // --- Difficulty ramp ---
-static int difficulty_frames;
 static int spawn_interval_dynamic;     // replaces SPAWN_INTERVAL usage
 static int enemy_fire_min_dynamic;
 static int enemy_fire_max_dynamic;
@@ -112,8 +111,6 @@ static Star stars[NUM_STARS];
 
 static int bg_offset;
 static int scroll_speed;
-static int level;
-static int score;
 
 //Really crude randomizer for enemy spawn
 static uint32_t rand_next(void) {
@@ -199,17 +196,6 @@ static void update_bullets(void)
     }
 }
 // -- DRAWING && HUD ---
-static void draw_rect(int x, int y, int w, int h, uint32_t color)
-{
-    for (int dy = 0; dy < h; dy++)
-    {
-        for (int dx = 0; dx < w; dx++)
-        {
-            video_set_pixel(x + dx, y + dy, color);
-        }
-    }
-}
-
 static void draw_hud(void) {
     int scale = 3;
     int line_h = text_height(scale) + 6;
@@ -379,7 +365,7 @@ static void pattern_cluster(void) {
 
 // Picks a pattern based on current difficulty and rolls a random selection.
 static void choose_and_spawn_pattern(void) {
-    int seconds = difficulty_frames / 60;
+    int seconds = 60;
     int roll = rand_next() % 100;
 
     if (seconds < 15) {
@@ -403,8 +389,7 @@ static void choose_and_spawn_pattern(void) {
     }
 }
 
-static void update_enemies(void)
-{
+static void update_enemies(void){
     spawn_timer--;
     if (spawn_timer <= 0){
 	// Only spawn if we haven't yet hit the wave quota
@@ -416,13 +401,11 @@ static void update_enemies(void)
     }
 
     for (int i = 0; i < MAX_ENEMIES; i++){
-        if (!enemies[i].active)
-            continue;
+        if (!enemies[i].active) continue;
         enemies[i].y += ENEMY_SPEED;
 
         // Enemy escaped past the bottom
-        if (enemies[i].y > SCREEN_HEIGHT)
-        {
+        if (enemies[i].y > SCREEN_HEIGHT){
             enemies[i].active = 0;
             enemies_escaped++;
             if (enemies_escaped >= MAX_ESCAPED) {
@@ -455,8 +438,8 @@ static void update_enemy_bullets(void) {
     for (int i = 0; i < MAX_ENEMY_BULLETS; i++) {
         if (!enemy_bullets[i].active) continue;
         enemy_bullets[i].y += ENEMY_BULLET_SPEED;  // downward
-        if (enemy_bullets[i].y > SCREEN_HEIGHT) {
-            enemy_bullets[i].active = 0;
+        if (enemy_bullets[i].y > SCREEN_HEIGHT) enemy_bullets[i].active = 0;
+    }
 }
 //--- Collisions ---
 
@@ -472,7 +455,7 @@ static int rects_overlap(int ax, int ay, int aw, int ah,
 
 //collision handler
 static void handle_collisions(void) {
-    // Bullet vs enemy
+    // Player bullet vs enemy
     for (int b = 0; b < MAX_BULLETS; b++) {
         if (!bullets[b].active) continue;
         for (int e = 0; e < MAX_ENEMIES; e++) {
@@ -481,9 +464,29 @@ static void handle_collisions(void) {
                               enemies[e].x, enemies[e].y, ENEMY_SIZE, ENEMY_SIZE)) {
                 bullets[b].active = 0;
                 enemies[e].active = 0;
-                score += 10;
-                break;  // this bullet is consumed, stop checking enemies
+                score += 10 * level;
+                break;
             }
+        }
+    }
+
+    // Enemy bullet vs player
+    for (int b = 0; b < MAX_ENEMY_BULLETS; b++) {
+        if (!enemy_bullets[b].active) continue;
+        if (rects_overlap(enemy_bullets[b].x, enemy_bullets[b].y, BULLET_WIDTH, BULLET_HEIGHT,
+                          player_x, player_y, PLAYER_SIZE, PLAYER_SIZE)) {
+            damage_player(DAMAGE_BULLET);
+            enemy_bullets[b].active = 0;
+        }
+    }
+
+    // Ram: player vs enemy
+    for (int e = 0; e < MAX_ENEMIES; e++) {
+        if (!enemies[e].active) continue;
+        if (rects_overlap(player_x, player_y, PLAYER_SIZE, PLAYER_SIZE,
+                          enemies[e].x, enemies[e].y, ENEMY_SIZE, ENEMY_SIZE)) {
+            damage_player(DAMAGE_RAM);
+            enemies[e].active = 0;
         }
     }
 }
@@ -571,6 +574,13 @@ void game_init(void)
     score = 0;
     apply_level_difficulty();
     spawn_timer = spawn_interval_dynamic;
+
+    bg_offset = 0;
+    scroll_speed = 1;
+    for (int i = 0; i < NUM_STARS; i++) {
+        stars[i].x = (i * 37) % SCREEN_WIDTH;
+        stars[i].y = (i * 53) % SCREEN_HEIGHT;
+    }
 }
 
 static void draw_game_over_overlay(void) {
@@ -591,19 +601,10 @@ static void draw_game_over_overlay(void) {
         int y2 = y1 + text_height(scale1) + 40;
         text_draw(line2, x2, y2, 0xFFFFFF, scale2);
     }
-    bg_offset = 0;
-    scroll_speed = 1;
-    level = 1;
-    score = 0;
 
-    for (int i = 0; i < NUM_STARS; i++) {
-        stars[i].x = (i * 37) % SCREEN_WIDTH;
-        stars[i].y = (i * 53) % SCREEN_HEIGHT;
-    }
 }
 
 void game_update_and_render(void) {
-<<<<<<< HEAD
     if(game_state == STATE_PLAYING){
 	update_player();
     	update_bullets();
@@ -620,7 +621,7 @@ void game_update_and_render(void) {
             return;
         }
     }
-    video_clear(0x000020);
+    draw_background();
     draw_player();
     draw_bullets();
     draw_enemy_bullets();
