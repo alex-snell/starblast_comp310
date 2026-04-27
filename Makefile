@@ -64,6 +64,7 @@ OBJS = \
 	sprite.o \
 	sprites_data.o \
 	text.o \
+	digits.o \
 
 # Make sure to keep a blank line here after OBJS list
 
