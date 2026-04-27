@@ -14,4 +14,7 @@ void text_draw(const char *str, int x, int y, uint32_t color, int scale);
 int text_width(const char *str, int scale);
 int text_height(int scale);
 
+// Render an integer as text at (x, y).
+void text_draw_int(int num, int x, int y, uint32_t color, int scale);
+
 #endif

@@ -4,10 +4,15 @@
 #include "input.h"
 #include "sprite.h"
 #include "text.h"
-#include "digits.h"
 
 //end game screen flash
 static int game_over_frames;  // counts up while in game-over state
+// --- Levels ---
+#define LEVEL_BANNER_FRAMES (60 * 2)
+static int waves_spawned_this_level;
+static int waves_required;          // recomputed per level
+static int level_banner_timer;
+
 // --- Player ---
 #define PLAYER_SIZE 50
 #define PLAYER_SPEED 4
@@ -77,10 +82,10 @@ static uint32_t rng_state;
 static Bullet enemy_bullets[MAX_ENEMY_BULLETS];
 
 //--- HUD ---
-static int score = 0;
-static int level = 1;
+static int score;
+static int level;
 
-static int get_enemy_count(void) {
+static int count_active_enemy(void) {
 	int count = 0;
 	for (int i = 0; i < MAX_ENEMIES; i++) {
 		if (enemies[i].active) count++;
@@ -146,8 +151,10 @@ static void update_player(void)
         player_x = 0;
     if (player_x > SCREEN_WIDTH - PLAYER_SIZE)
         player_x = SCREEN_WIDTH - PLAYER_SIZE;
-    if (player_y < 0)
-        player_y = 0;
+
+    int min_y = SCREEN_HEIGHT / 2;          // top of bottom half
+    if (player_y < min_y)
+        player_y = min_y;
 
     if (player_y > SCREEN_HEIGHT - PLAYER_SIZE)
         player_y = SCREEN_HEIGHT - PLAYER_SIZE;
@@ -177,7 +184,7 @@ static void update_bullets(void)
         }
     }
 }
-
+// -- DRAWING && HUD ---
 static void draw_rect(int x, int y, int w, int h, uint32_t color)
 {
     for (int dy = 0; dy < h; dy++)
@@ -189,59 +196,32 @@ static void draw_rect(int x, int y, int w, int h, uint32_t color)
     }
 }
 
-static void draw_digit(int x, int y, int digit) {
-	switch(digit) {
-		case 0: sprite_draw(&sprite_digit_0, x, y);
-		break;
-                case 1: sprite_draw(&sprite_digit_1, x, y);
-                break;
-/*                case 2: sprite_draw(&sprite_digit_2, x, y);
-                break;
-                case 3: sprite_draw(&sprite_digit_3, x, y);
-                break;
-                case 4: sprite_draw(&sprite_digit_4, x, y);
-                break;
-                case 5: sprite_draw(&sprite_digit_5, x, y);
-                break;
-                case 6: sprite_draw(&sprite_digit_6, x, y);
-                break;
-                case 7: sprite_draw(&sprite_digit_7, x, y);
-                break;
-                case 8: sprite_draw(&sprite_digit_8, x, y);
-                break;
-                case 9: sprite_draw(&sprite_digit_9, x, y);
-                break;
-*/		// fallback
-		default:
-			video_set_pixel(x, y, 0xFFFFFF);
-			break;
-	}
-}
-
-static void draw_number(int x, int y, int num) {
-	if (num == 0) {
-		draw_digit(x, y, 0);
-		return;
-	}
-
-	int digits[10];
-	int count = 0;
-
-	while (num > 0) {
-		digits[count++] = num % 10;
-		num /= 10;
-	}
-
-	for (int i = 0; i < count; i++) {
-		draw_digit(x + (count - i - 1) * 4, y, digits[i]);
-	}
-}
-
 static void draw_hud(void) {
-	draw_number(10, 10, score);				// score
-	draw_number(10, 25, get_enemy_count());			// enemies
-	draw_number(10, 40, level);				// level
-	draw_number(10, 55, PLAYER_MAX_DAMAGE - player_damage);	// health
+    int scale = 3;
+    int line_h = text_height(scale) + 6;
+    int label_pad = scale * 6 * 8;   // reserve space for a 8-char label + gap
+
+    int x_label = 10;
+    int x_value = 10 + text_width("HEALTH  ", scale);
+
+    int y = 10;
+
+    text_draw("SCORE",   x_label, y, 0xFFFFFF, scale);
+    text_draw_int(score, x_value, y, 0xFFFFFF, scale);
+    y += line_h;
+
+    text_draw("LEVEL",   x_label, y, 0xFFFF00, scale);
+    text_draw_int(level, x_value, y, 0xFFFF00, scale);
+    y += line_h;
+
+    text_draw("HEALTH",  x_label, y, 0x40FF40, scale);
+    text_draw_int(PLAYER_MAX_DAMAGE - player_damage, x_value, y, 0x40FF40, scale);
+    y += line_h;
+
+    text_draw("ESCAPED", x_label, y, 0xFF8040, scale);
+    text_draw_int(enemies_escaped, x_value, y, 0xFF8040, scale);
+
+    (void)label_pad; // unused, keeping for clarity
 }
 
 static const Sprite *current_player_sprite(void) {
@@ -276,29 +256,57 @@ static void damage_player(int amount) {
     if (player_damage >= PLAYER_MAX_DAMAGE){ 
 	player_damage = PLAYER_MAX_DAMAGE;
 	game_state = STATE_GAME_OVER;
+        level_banner_timer = 0;
    }else{ 
    	player_invuln_frames = INVULN_DURATION;
    }
-
+   if (enemies_escaped >= MAX_ESCAPED) {
+    game_state = STATE_GAME_OVER;
+    level_banner_timer = 0;     // <-- new
+   }
 }
 
+static void draw_level_banner(void) {
+    if (level_banner_timer <= 0) return;
+    if (game_state == STATE_GAME_OVER) return; 
+
+    char buf[16];
+    int idx = 0;
+    const char *prefix = "LEVEL ";
+    for (const char *p = prefix; *p; p++) buf[idx++] = *p;
+
+    if (level >= 100) buf[idx++] = '0' + (level / 100) % 10;
+    if (level >= 10)  buf[idx++] = '0' + (level / 10) % 10;
+    buf[idx++] = '0' + (level % 10);
+    buf[idx] = '\0';
+
+    int scale = 8;
+    int x = SCREEN_WIDTH / 2 - text_width(buf, scale) / 2;
+    int y = SCREEN_HEIGHT / 2 - text_height(scale) / 2;
+
+    text_draw(buf, x, y, 0xFFFF00, scale);
+}
 //Difficulty
-static void update_difficulty(void) {
-    difficulty_frames++;
-    int seconds_elapsed = difficulty_frames / 60;
 
-    spawn_interval_dynamic = 90 - seconds_elapsed;
-    if (spawn_interval_dynamic < 20) spawn_interval_dynamic = 20;
+static void apply_level_difficulty(void) {
+    spawn_interval_dynamic = 90 - (level - 1) * 8;
+    if (spawn_interval_dynamic < 15) spawn_interval_dynamic = 15;
 
-    enemy_fire_min_dynamic = 180 - seconds_elapsed * 2;
-    if (enemy_fire_min_dynamic < 50) enemy_fire_min_dynamic = 50;
-    enemy_fire_max_dynamic = 300 - seconds_elapsed * 3;
-    if (enemy_fire_max_dynamic < 100) enemy_fire_max_dynamic = 100;
+    enemy_fire_min_dynamic = 180 - (level - 1) * 12;
+    if (enemy_fire_min_dynamic < 40) enemy_fire_min_dynamic = 40;
+
+    enemy_fire_max_dynamic = 300 - (level - 1) * 18;
+    if (enemy_fire_max_dynamic < 90) enemy_fire_max_dynamic = 90;
+
     if (enemy_fire_max_dynamic <= enemy_fire_min_dynamic) {
         enemy_fire_max_dynamic = enemy_fire_min_dynamic + 30;
     }
-}
 
+    // Number of pattern-spawns required to advance.
+    // Level 1: 3 waves. Level 2: 4. Level 5: 7. Level 10: 12. Cap at 20.
+    waves_required = 2 + (level/5);
+    if (waves_required > 20) waves_required = 20;
+}
 
 //ENEMIES
 
@@ -383,14 +391,16 @@ static void choose_and_spawn_pattern(void) {
 static void update_enemies(void)
 {
     spawn_timer--;
-    if (spawn_timer <= 0)
-    {
-        choose_and_spawn_pattern();
+    if (spawn_timer <= 0){
+	// Only spawn if we haven't yet hit the wave quota
+        if (waves_spawned_this_level < waves_required) {
+            choose_and_spawn_pattern();
+            waves_spawned_this_level++;
+        }
         spawn_timer = spawn_interval_dynamic;
     }
 
-    for (int i = 0; i < MAX_ENEMIES; i++)
-    {
+    for (int i = 0; i < MAX_ENEMIES; i++){
         if (!enemies[i].active)
             continue;
         enemies[i].y += ENEMY_SPEED;
@@ -416,6 +426,8 @@ static void update_enemies(void)
     }
 }
 
+
+
 static void draw_enemies(void) {
     for (int i = 0; i < MAX_ENEMIES; i++) {
         if (!enemies[i].active) continue;
@@ -431,6 +443,17 @@ static void update_enemy_bullets(void) {
         if (enemy_bullets[i].y > SCREEN_HEIGHT) {
             enemy_bullets[i].active = 0;
         }
+    }
+}
+
+static void check_level_up(void) {
+    // Both conditions must be true: full quota spawned AND screen is clear.
+    if (waves_spawned_this_level >= waves_required &&
+        count_active_enemy() == 0) {
+        level++;
+        waves_spawned_this_level = 0;
+        level_banner_timer = LEVEL_BANNER_FRAMES;
+        apply_level_difficulty();
     }
 }
 
@@ -475,7 +498,7 @@ static void handle_collisions(void)
             {
                 bullets[b].active = 0;
                 enemies[e].active = 0;
-		score += 10;
+		score += 10 * level;
                 break; // this bullet is consumed, stop checking enemies
             }
         }
@@ -523,9 +546,12 @@ void game_init(void)
     game_state = STATE_PLAYING;
     game_over_frames = 0;
 
-    difficulty_frames = 0;
-    enemies_escaped = 0;
-    update_difficulty();              // initialize spawn/fire variables
+    spawn_timer = spawn_interval_dynamic;
+    level = 1;
+    waves_spawned_this_level = 0;
+    level_banner_timer = LEVEL_BANNER_FRAMES;
+    score = 0;
+    apply_level_difficulty();
     spawn_timer = spawn_interval_dynamic;
 }
 
@@ -554,10 +580,11 @@ void game_update_and_render(void) {
 	update_player();
     	update_bullets();
     	update_enemies();
-	update_difficulty();
     	update_enemy_bullets();
     	handle_collisions();
-    } else if (game_state == STATE_GAME_OVER) {
+	check_level_up();
+          if (level_banner_timer > 0) level_banner_timer--; 
+   } else if (game_state == STATE_GAME_OVER) {
         game_over_frames++;
         if (input_is_key_down(KEY_R)) {
             game_init();
@@ -569,7 +596,8 @@ void game_update_and_render(void) {
     draw_bullets();
     draw_enemy_bullets();
     draw_enemies();
-	draw_hud();
+    draw_hud();
+    draw_level_banner();
     if (game_state == STATE_GAME_OVER) {
         draw_game_over_overlay();
     }

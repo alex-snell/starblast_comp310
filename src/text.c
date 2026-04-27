@@ -90,6 +90,34 @@ static void draw_glyph(const Glyph *g, int x, int y, uint32_t color, int scale) 
     }
 }
 
+void text_draw_int(int num, int x, int y, uint32_t color, int scale) {
+    char buf[16];
+    int idx = 0;
+
+    if (num < 0) {
+        buf[idx++] = '-';
+        num = -num;
+    }
+
+    if (num == 0) {
+        buf[idx++] = '0';
+    } else {
+        // Build digits in reverse, then flip into final position
+        char rev[16];
+        int rcount = 0;
+        while (num > 0 && rcount < 15) {
+            rev[rcount++] = '0' + (num % 10);
+            num /= 10;
+        }
+        while (rcount > 0) {
+            buf[idx++] = rev[--rcount];
+        }
+    }
+    buf[idx] = '\0';
+
+    text_draw(buf, x, y, color, scale);
+}
+
 void text_draw(const char *str, int x, int y, uint32_t color, int scale) {
     int cursor_x = x;
     for (const char *p = str; *p; p++) {
