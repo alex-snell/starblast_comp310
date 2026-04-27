@@ -42,6 +42,17 @@ typedef struct
 
 static Bullet bullets[MAX_BULLETS];
 
+
+// --- Difficulty ramp ---
+static int difficulty_frames;
+static int spawn_interval_dynamic;     // replaces SPAWN_INTERVAL usage
+static int enemy_fire_min_dynamic;
+static int enemy_fire_max_dynamic;
+
+// --- Escape tracking ---
+#define MAX_ESCAPED 10
+static int enemies_escaped;
+
 //--- ENEMIES ---
 #define MAX_ENEMIES 64
 #define ENEMY_SIZE  64
@@ -204,54 +215,139 @@ static void damage_player(int amount) {
 
 }
 
+//Difficulty
+static void update_difficulty(void) {
+    difficulty_frames++;
+    int seconds_elapsed = difficulty_frames / 60;
+
+    spawn_interval_dynamic = 90 - seconds_elapsed;
+    if (spawn_interval_dynamic < 20) spawn_interval_dynamic = 20;
+
+    enemy_fire_min_dynamic = 180 - seconds_elapsed * 2;
+    if (enemy_fire_min_dynamic < 50) enemy_fire_min_dynamic = 50;
+    enemy_fire_max_dynamic = 300 - seconds_elapsed * 3;
+    if (enemy_fire_max_dynamic < 100) enemy_fire_max_dynamic = 100;
+    if (enemy_fire_max_dynamic <= enemy_fire_min_dynamic) {
+        enemy_fire_max_dynamic = enemy_fire_min_dynamic + 30;
+    }
+}
+
+
 //ENEMIES
-static void spawn_enemy(void)
-{
-    for (int i = 0; i < MAX_ENEMIES; i++)
-    {
-        if (!enemies[i].active)
-        {
-            enemies[i].x = rand_next() % (SCREEN_WIDTH - ENEMY_SIZE);
-            enemies[i].y = -ENEMY_SIZE; // start just above top of screen
+
+// Spawns one enemy at a specific (x, y). Used by patterns.
+static void spawn_enemy_at(int x, int y) {
+    for (int i = 0; i < MAX_ENEMIES; i++) {
+        if (!enemies[i].active) {
+            enemies[i].x = x;
+            enemies[i].y = y;
             enemies[i].active = 1;
-	    enemies[i].fire_cooldown = ENEMY_FIRE_RATE_MIN + (rand_next() % (ENEMY_FIRE_RATE_MAX - ENEMY_FIRE_RATE_MIN)); 
+            enemies[i].fire_cooldown = enemy_fire_min_dynamic +
+                (rand_next() % (enemy_fire_max_dynamic - enemy_fire_min_dynamic));
             return;
         }
     }
 }
 
+// --- Spawn patterns ---
+
+// Single random enemy at the top.
+static void pattern_single(void) {
+    int x = rand_next() % (SCREEN_WIDTH - ENEMY_SIZE);
+    spawn_enemy_at(x, -ENEMY_SIZE);
+}
+
+// V formation: 5 enemies, point-down V centered on a random x.
+static void pattern_v_formation(void) {
+    int center_x = (SCREEN_WIDTH / 2) +
+        (rand_next() % (SCREEN_WIDTH / 2)) - SCREEN_WIDTH / 4;
+    int spacing = ENEMY_SIZE + 8;
+
+    spawn_enemy_at(center_x - ENEMY_SIZE / 2, -ENEMY_SIZE);
+    spawn_enemy_at(center_x - ENEMY_SIZE / 2 - spacing, -ENEMY_SIZE - spacing);
+    spawn_enemy_at(center_x - ENEMY_SIZE / 2 + spacing, -ENEMY_SIZE - spacing);
+    spawn_enemy_at(center_x - ENEMY_SIZE / 2 - spacing * 2, -ENEMY_SIZE - spacing * 2);
+    spawn_enemy_at(center_x - ENEMY_SIZE / 2 + spacing * 2, -ENEMY_SIZE - spacing * 2);
+}
+
+// Horizontal wave: 5 enemies evenly spaced across the screen.
+static void pattern_horizontal_wave(void) {
+    int spacing = SCREEN_WIDTH / 6;
+    for (int i = 1; i <= 5; i++) {
+        spawn_enemy_at(spacing * i - ENEMY_SIZE / 2, -ENEMY_SIZE);
+    }
+}
+
+// Cluster: 4 enemies stacked vertically at one column.
+static void pattern_cluster(void) {
+    int x = rand_next() % (SCREEN_WIDTH - ENEMY_SIZE);
+    int spacing = ENEMY_SIZE + 8;
+    for (int i = 0; i < 4; i++) {
+        spawn_enemy_at(x, -ENEMY_SIZE - i * spacing);
+    }
+}
+
+// Picks a pattern based on current difficulty and rolls a random selection.
+static void choose_and_spawn_pattern(void) {
+    int seconds = difficulty_frames / 60;
+    int roll = rand_next() % 100;
+
+    if (seconds < 15) {
+        // Easy phase: only singles.
+        pattern_single();
+    } else if (seconds < 45) {
+        // Medium phase: mostly singles, occasional V.
+        if (roll < 70) pattern_single();
+        else pattern_v_formation();
+    } else if (seconds < 90) {
+        // Harder: introduce horizontal waves.
+        if (roll < 50) pattern_single();
+        else if (roll < 80) pattern_v_formation();
+        else pattern_horizontal_wave();
+    } else {
+        // Hard phase: all patterns possible, including clusters.
+        if (roll < 30) pattern_single();
+        else if (roll < 55) pattern_v_formation();
+        else if (roll < 80) pattern_horizontal_wave();
+        else pattern_cluster();
+    }
+}
+
 static void update_enemies(void)
 {
-    // Spawn on a timer
     spawn_timer--;
     if (spawn_timer <= 0)
     {
-        spawn_enemy();
-        spawn_timer = SPAWN_INTERVAL;
+        choose_and_spawn_pattern();
+        spawn_timer = spawn_interval_dynamic;
     }
 
-    // Move each active enemy downward
     for (int i = 0; i < MAX_ENEMIES; i++)
     {
         if (!enemies[i].active)
             continue;
         enemies[i].y += ENEMY_SPEED;
+
+        // Enemy escaped past the bottom
         if (enemies[i].y > SCREEN_HEIGHT)
         {
             enemies[i].active = 0;
+            enemies_escaped++;
+            if (enemies_escaped >= MAX_ESCAPED) {
+                game_state = STATE_GAME_OVER;
+            }
+            continue;
         }
 
-    // Fire if cooldown expired AND enemy is on-screen
         enemies[i].fire_cooldown--;
         if (enemies[i].fire_cooldown <= 0 && enemies[i].y > 0) {
             fire_enemy_bullet(enemies[i].x + ENEMY_SIZE/2 - BULLET_WIDTH/2,
                               enemies[i].y + ENEMY_SIZE);
-            enemies[i].fire_cooldown = ENEMY_FIRE_RATE_MIN +
-                (rand_next() % (ENEMY_FIRE_RATE_MAX - ENEMY_FIRE_RATE_MIN));
+            enemies[i].fire_cooldown = enemy_fire_min_dynamic +
+                (rand_next() % (enemy_fire_max_dynamic - enemy_fire_min_dynamic));
         }
     }
 }
-
 
 static void draw_enemies(void) {
     for (int i = 0; i < MAX_ENEMIES; i++) {
@@ -358,6 +454,11 @@ void game_init(void)
     player_invuln_frames = 0;
     game_state = STATE_PLAYING;
     game_over_frames = 0;
+
+    difficulty_frames = 0;
+    enemies_escaped = 0;
+    update_difficulty();              // initialize spawn/fire variables
+    spawn_timer = spawn_interval_dynamic;
 }
 
 static void draw_game_over_overlay(void) {
@@ -385,6 +486,7 @@ void game_update_and_render(void) {
 	update_player();
     	update_bullets();
     	update_enemies();
+	update_difficulty();
     	update_enemy_bullets();
     	handle_collisions();
     } else if (game_state == STATE_GAME_OVER) {
