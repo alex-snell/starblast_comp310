@@ -288,7 +288,6 @@ static void draw_level_banner(void) {
 }
 
 //Difficulty
-
 static void apply_level_difficulty(void) {
     spawn_interval_dynamic = 90 - (level - 1) * 8;
     if (spawn_interval_dynamic < 15) spawn_interval_dynamic = 15;
@@ -303,10 +302,13 @@ static void apply_level_difficulty(void) {
         enemy_fire_max_dynamic = enemy_fire_min_dynamic + 30;
     }
 
-    // Number of pattern-spawns required to advance.
-    // Level 1: 3 waves. Level 2: 4. Level 5: 7. Level 10: 12. Cap at 20.
-    waves_required = 2 + (level/5);
-    if (waves_required > 20) waves_required = 20;
+    // Wave count scales by 5-level tiers.
+    // Tier 0 (lvl 1-4):  1 wave
+    // Tier 1 (lvl 5-9):  2 waves
+    // Tier 2 (lvl 10-14): 3 waves
+    // ... etc
+    waves_required = 1 + ((level - 1) / 5);
+    if (waves_required > 8) waves_required = 8;   // cap to avoid endless waves
 }
 
 //ENEMIES
@@ -326,11 +328,12 @@ static void spawn_enemy_at(int x, int y) {
 }
 
 // --- Spawn patterns ---
-
-// Single random enemy at the top.
-static void pattern_single(void) {
-    int x = rand_next() % (SCREEN_WIDTH - ENEMY_SIZE);
-    spawn_enemy_at(x, -ENEMY_SIZE);
+static void pattern_starter(void) {
+    int n = 2 + (rand_next() % 2);  // 2 or 3 enemies
+    for (int i = 0; i < n; i++) {
+        int x = rand_next() % (SCREEN_WIDTH - ENEMY_SIZE);
+        spawn_enemy_at(x, -ENEMY_SIZE - i * (ENEMY_SIZE + 8));
+    }
 }
 
 // V formation: 5 enemies, point-down V centered on a random x.
@@ -365,28 +368,34 @@ static void pattern_cluster(void) {
 
 // Picks a pattern based on current difficulty and rolls a random selection.
 static void choose_and_spawn_pattern(void) {
-    int seconds = 60;
     int roll = rand_next() % 100;
 
-    if (seconds < 15) {
-        // Easy phase: only singles.
-        pattern_single();
-    } else if (seconds < 45) {
-        // Medium phase: mostly singles, occasional V.
-        if (roll < 70) pattern_single();
-        else pattern_v_formation();
-    } else if (seconds < 90) {
-        // Harder: introduce horizontal waves.
-        if (roll < 50) pattern_single();
-        else if (roll < 80) pattern_v_formation();
-        else pattern_horizontal_wave();
-    } else {
-        // Hard phase: all patterns possible, including clusters.
-        if (roll < 30) pattern_single();
-        else if (roll < 55) pattern_v_formation();
-        else if (roll < 80) pattern_horizontal_wave();
-        else pattern_cluster();
+    // Tier 0: levels 1-4. Singles only. Gentle introduction.
+    if (level < 5) {
+        pattern_starter();
+        return;
     }
+
+    // Tier 1: levels 5-9. Mix singles and V formations.
+    if (level < 10) {
+        if (roll < 60) pattern_starter();
+        else pattern_v_formation();
+        return;
+    }
+
+    // Tier 2: levels 10-14. Add horizontal waves.
+    if (level < 15) {
+        if (roll < 40) pattern_starter();
+        else if (roll < 75) pattern_v_formation();
+        else pattern_horizontal_wave();
+        return;
+    }
+
+    // Tier 3: levels 15+. All patterns including clusters.
+    if (roll < 25) pattern_starter();
+    else if (roll < 50) pattern_v_formation();
+    else if (roll < 75) pattern_horizontal_wave();
+    else pattern_cluster();
 }
 
 static void update_enemies(void){
