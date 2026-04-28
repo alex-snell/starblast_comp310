@@ -12,4 +12,5 @@ void game_init(void);
 // Call once per iteration of the main loop.
 void game_update_and_render(void);
 
+
 #endif

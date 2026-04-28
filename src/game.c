@@ -5,7 +5,9 @@
 #include "sprite.h"
 #include "text.h"
 
-//end game screen flash
+//intilizationa nd end game
+static void draw_game_over_overlay(void);
+void game_init(void);
 static int game_over_frames;  // counts up while in game-over state
 // --- Levels ---
 #define LEVEL_BANNER_FRAMES (60 * 2)
@@ -442,6 +444,12 @@ static void draw_enemies(void) {
     }
 }
 
+static void draw_enemy_bullets(void) {
+    for (int i = 0; i < MAX_ENEMY_BULLETS; i++) {
+        if (!enemy_bullets[i].active) continue;
+        sprite_draw(&sprite_enemy_bullet, enemy_bullets[i].x, enemy_bullets[i].y);
+    }
+}
 
 static void update_enemy_bullets(void) {
     for (int i = 0; i < MAX_ENEMY_BULLETS; i++) {
@@ -500,24 +508,12 @@ static void handle_collisions(void) {
     }
 }
 
-
-static void check_level_up(void) {
-    // Both conditions must be true: full quota spawned AND screen is clear.
-    if (waves_spawned_this_level >= waves_required &&
-        count_active_enemy() == 0) {
-        level++;
-        waves_spawned_this_level = 0;
-        level_banner_timer = LEVEL_BANNER_FRAMES;
-        apply_level_difficulty();
-    }
-}
-
 // --- BACKGROUND ---
 static void draw_background(void) {
     uint32_t star_color;
     uint32_t bg_color;
 
-    int theme = ((level - 1) / 5) % 3;
+    int theme = (level / 5) % 3;
 
     if (theme == 0) {
         star_color = 0xFFFFFF;
@@ -542,6 +538,17 @@ static void draw_background(void) {
     for (int i = 0; i < NUM_STARS; i++) {
         int y = (stars[i].y + bg_offset) % SCREEN_HEIGHT;
         video_set_pixel(stars[i].x, y, star_color);
+    }
+}
+
+static void check_level_up(void) {
+    // Both conditions must be true: full quota spawned AND screen is clear.
+    if (waves_spawned_this_level >= waves_required &&
+        count_active_enemy() == 0) {
+        level++;
+        waves_spawned_this_level = 0;
+        level_banner_timer = LEVEL_BANNER_FRAMES;
+        apply_level_difficulty();
     }
 }
 
@@ -572,5 +579,55 @@ void game_update_and_render(void) {
 
     if (game_state == STATE_GAME_OVER) {
         draw_game_over_overlay();
+    }
+}
+static void draw_game_over_overlay(void) {
+    const char *line1 = "GAME OVER";
+    const char *line2 = "PRESS R TO RESTART";
+
+    int scale1 = 8;
+    int scale2 = 3;
+
+    int x1 = SCREEN_WIDTH / 2 - text_width(line1, scale1) / 2;
+    int y1 = SCREEN_HEIGHT / 2 - text_height(scale1) / 2 - 40;
+
+    text_draw(line1, x1, y1, 0xFF0000, scale1);
+
+    if ((game_over_frames / 30) & 1) {
+        int x2 = SCREEN_WIDTH / 2 - text_width(line2, scale2) / 2;
+        int y2 = y1 + text_height(scale1) + 40;
+        text_draw(line2, x2, y2, 0xFFFFFF, scale2);
+    }
+}
+
+void game_init(void) {
+    player_x = SCREEN_WIDTH / 2 - PLAYER_SIZE / 2;
+    player_y = (SCREEN_HEIGHT * 3 / 4) - PLAYER_SIZE / 2;
+
+    for (int i = 0; i < MAX_BULLETS; i++) bullets[i].active = 0;
+    for (int i = 0; i < MAX_ENEMY_BULLETS; i++) enemy_bullets[i].active = 0;
+    for (int i = 0; i < MAX_ENEMIES; i++) enemies[i].active = 0;
+
+    space_was_down = 0;
+    rng_state = 0xC0FFEE;
+
+    player_damage = 0;
+    player_invuln_frames = 0;
+    enemies_escaped = 0;
+    game_state = STATE_PLAYING;
+    game_over_frames = 0;
+
+    level = 1;
+    waves_spawned_this_level = 0;
+    level_banner_timer = LEVEL_BANNER_FRAMES;
+    score = 0;
+    apply_level_difficulty();
+    spawn_timer = spawn_interval_dynamic;
+
+    bg_offset = 0;
+    scroll_speed = 1;
+    for (int i = 0; i < NUM_STARS; i++) {
+        stars[i].x = (i * 37) % SCREEN_WIDTH;
+        stars[i].y = (i * 53) % SCREEN_HEIGHT;
     }
 }
