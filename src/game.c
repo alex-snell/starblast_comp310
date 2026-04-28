@@ -135,7 +135,6 @@ static void fire_bullet(int x, int y)
     }
 }
 
-
 static void fire_enemy_bullet(int x, int y) {
     for (int i = 0; i < MAX_ENEMY_BULLETS; i++) {
         if (!enemy_bullets[i].active) {
@@ -163,7 +162,7 @@ static void update_player(void)
     if (player_x > SCREEN_WIDTH - PLAYER_SIZE)
         player_x = SCREEN_WIDTH - PLAYER_SIZE;
 
-    int min_y = SCREEN_HEIGHT / 2;          // top of bottom half
+    int min_y = SCREEN_HEIGHT / 2;
     if (player_y < min_y)
         player_y = min_y;
 
@@ -195,6 +194,7 @@ static void update_bullets(void)
         }
     }
 }
+
 // -- DRAWING && HUD ---
 static void draw_hud(void) {
     int scale = 3;
@@ -512,23 +512,25 @@ static void check_level_up(void) {
     }
 }
 
+// --- BACKGROUND ---
 static void draw_background(void) {
     uint32_t star_color;
     uint32_t bg_color;
 
-    if (level == 1) {
+    int theme = ((level - 1) / 5) % 3;
+
+    if (theme == 0) {
         star_color = 0xFFFFFF;
         bg_color = 0x000020;
-        scroll_speed = 1;
-    } else if (level == 2) {
+    } else if (theme == 1) {
         star_color = 0x00FF00;
         bg_color = 0x001000;
-        scroll_speed = 2;
     } else {
         star_color = 0xFF0000;
         bg_color = 0x200000;
-        scroll_speed = 3;
     }
+
+    scroll_speed = 1 + (level / 3);
 
     video_clear(bg_color);
 
@@ -543,76 +545,6 @@ static void draw_background(void) {
     }
 }
 
-
-
-static void draw_enemy_bullets(void) {
-    for (int i = 0; i < MAX_ENEMY_BULLETS; i++) {
-        if (!enemy_bullets[i].active) continue;
-        sprite_draw(&sprite_enemy_bullet, enemy_bullets[i].x, enemy_bullets[i].y);
-    }
-}
-
-
-// MAIN
-void game_init(void)
-{
-    player_x = SCREEN_WIDTH / 2 - PLAYER_SIZE / 2;
-    player_y = (SCREEN_HEIGHT * 3 / 4) - PLAYER_SIZE / 2;
-
-    for (int i = 0; i < MAX_BULLETS; i++)
-    {
-        bullets[i].active = 0;
-    }
-
-    for (int i = 0; i < MAX_BULLETS; i++) bullets[i].active = 0;
-    for(int i = 0; i < MAX_ENEMY_BULLETS; i++) enemy_bullets[i].active = 0;
-    for(int i = 0; i < MAX_ENEMIES; i++) enemies[i].active = 0;
-    space_was_down = 0;
-    spawn_timer = SPAWN_INTERVAL;
-    rng_state = 0xC0FFEE; //uhhh idk
-
-    player_damage = 0;
-    player_invuln_frames = 0;
-    game_state = STATE_PLAYING;
-    game_over_frames = 0;
-
-    spawn_timer = spawn_interval_dynamic;
-    level = 1;
-    waves_spawned_this_level = 0;
-    level_banner_timer = LEVEL_BANNER_FRAMES;
-    score = 0;
-    apply_level_difficulty();
-    spawn_timer = spawn_interval_dynamic;
-
-    bg_offset = 0;
-    scroll_speed = 1;
-    for (int i = 0; i < NUM_STARS; i++) {
-        stars[i].x = (i * 37) % SCREEN_WIDTH;
-        stars[i].y = (i * 53) % SCREEN_HEIGHT;
-    }
-}
-
-static void draw_game_over_overlay(void) {
-    const char *line1 = "GAME OVER";
-    const char *line2 = "PRESS R TO RESTART";
-
-    int scale1 = 8;  // big "GAME OVER"
-    int scale2 = 3;  // smaller "PRESS R..."
-
-    int x1 = SCREEN_WIDTH / 2 - text_width(line1, scale1) / 2;
-    int y1 = SCREEN_HEIGHT / 2 - text_height(scale1) / 2 - 40;
-
-    text_draw(line1, x1, y1, 0xFF0000, scale1);
-
-    // Flash the "PRESS R" text every ~30 frames (half-second at 60 FPS)
-    if ((game_over_frames / 30) & 1) {
-        int x2 = SCREEN_WIDTH / 2 - text_width(line2, scale2) / 2;
-        int y2 = y1 + text_height(scale1) + 40;
-        text_draw(line2, x2, y2, 0xFFFFFF, scale2);
-    }
-
-}
-
 void game_update_and_render(void) {
     if(game_state == STATE_PLAYING){
 	update_player();
@@ -621,15 +553,15 @@ void game_update_and_render(void) {
     	update_enemy_bullets();
     	handle_collisions();
 	check_level_up();
-	draw_background();
         if (level_banner_timer > 0) level_banner_timer--; 
-        } else if (game_state == STATE_GAME_OVER) {
+    } else if (game_state == STATE_GAME_OVER) {
         game_over_frames++;
         if (input_is_key_down(KEY_R)) {
             game_init();
             return;
         }
     }
+
     draw_background();
     draw_player();
     draw_bullets();
@@ -637,6 +569,7 @@ void game_update_and_render(void) {
     draw_enemies();
     draw_hud();
     draw_level_banner();
+
     if (game_state == STATE_GAME_OVER) {
         draw_game_over_overlay();
     }
